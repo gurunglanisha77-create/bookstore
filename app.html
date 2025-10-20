@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bookstore — Vue.js</title>
+
+  <!-- Link stylesheet -->
+  <link rel="stylesheet" href="Book.css" />
+
+  <!-- Vue 3 (global build) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+  <!-- App script (deferred) -->
+  <script src="book.vue.js" defer></script>
+</head>
+<body>
+  <div id="app" class="app">
+    <header class="topbar">
+      <div class="brand">📚 Bookstore</div>
+
+      <div class="nav-right">
+        <template v-if="user">
+          <span class="welcome">Hello, {{ user.name }}</span>
+          <button @click="goTo('bookstore')" class="linkish">Browse</button>
+          <button @click="goTo('cart')" class="linkish">Cart ({{ cart.length }})</button>
+          <button @click="logout" class="btn small">Logout</button>
+        </template>
+      </div>
+    </header>
+
+    <main class="container">
+      <!-- LOGIN PAGE -->
+      <section v-if="page === 'login'" class="card auth-card">
+        <h2>Login</h2>
+        <form @submit.prevent="login" novalidate>
+          <label>
+            Email
+            <input v-model="loginForm.email" type="email" placeholder="you@example.com" required />
+          </label>
+          <label>
+            Password
+            <input v-model="loginForm.password" type="password" placeholder="password" required minlength="3" />
+          </label>
+
+          <div class="form-row">
+            <button class="btn" type="submit">Login</button>
+            <button type="button" class="btn alt" @click="goTo('bookstore')">Continue as guest</button>
+          </div>
+
+          <p v-if="loginError" class="error">{{ loginError }}</p>
+
+          <hr />
+
+          <h3>Demo accounts (client-side demo only)</h3>
+          <ul class="demo-list">
+            <li><strong>Parent</strong> — parent@example.com / 123</li>
+            <li><strong>Student</strong> — student@example.com / 234</li>
+          </ul>
+        </form>
+      </section>
+
+      <!-- BOOKSTORE / LESSONS -->
+      <section v-if="page === 'bookstore'">
+        <div class="toolbar">
+          <input v-model="search" placeholder="Search subject, location or instructor..." />
+          <select v-model="filterLocation">
+            <option value="">All locations</option>
+            <option v-for="loc in uniqueLocations" :key="loc" :value="loc">{{ loc }}</option>
+          </select>
+          <select v-model="sortBy">
+            <option value="default">Sort: default</option>
+            <option value="price-asc">Price ↑</option>
+            <option value="price-desc">Price ↓</option>
+            <option value="spaces-desc">Most spaces</option>
+          </select>
+        </div>
+
+        <div class="grid">
+          <article class="lesson" v-for="lesson in filteredLessons" :key="lesson.id">
+            <img :src="lesson.image" alt="Lesson image" class="lesson-image"/>
+            <div class="lesson-left">
+              <h3 class="lesson-title">{{ lesson.subject }}</h3>
+              <p class="muted">{{ lesson.instructor }} • {{ lesson.location }}</p>
+              <p class="desc">{{ lesson.description }}</p>
+              <p class="meta">
+                <strong>Schedule:</strong> {{ lesson.schedule }} 
+                <strong>Spaces:</strong> 
+                <span :class="{ full: lesson.spaces === 0 }">{{ lesson.spaces }}</span>
+              </p>
+            </div>
+
+            <div class="lesson-right">
+              <div class="price">£{{ lesson.price.toFixed(2) }}</div>
+              <div class="actions">
+                <button @click="addToCart(lesson)" :disabled="lesson.spaces === 0" class="btn">Add to cart</button>
+                <button @click="viewDetail(lesson)" class="btn alt small">Details</button>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- LESSON DETAIL MODAL (simple view) -->
+      <section v-if="page === 'detail'" class="card">
+        <button class="btn small alt back" @click="goTo('bookstore')">← Back to list</button>
+        <h2>{{ detailLesson.subject }}</h2>
+        <p class="muted">{{ detailLesson.instructor }} • {{ detailLesson.location }}</p>
+        <p>{{ detailLesson.description }}</p>
+        <p><strong>Schedule:</strong> {{ detailLesson.schedule }}</p>
+        <p><strong>Spaces:</strong> {{ detailLesson.spaces }}</p>
+        <p class="price">£{{ detailLesson.price.toFixed(2) }}</p>
+        <div class="form-row">
+          <button @click="addToCart(detailLesson)" :disabled="detailLesson.spaces === 0" class="btn">Book</button>
+          <button @click="goTo('bookstore')" class="btn alt">Close</button>
+        </div>
+      </section>
+
+      <!-- CART -->
+      <section v-if="page === 'cart'" class="card">
+        <h2>Your Cart ({{ cart.length }})</h2>
+        <div v-if="cart.length === 0" class="empty">Your cart is empty — <button class="linkish" @click="goTo('bookstore')">browse lessons</button></div>
+
+        <ul class="cart-list" v-else>
+          <li v-for="(item, idx) in cart" :key="idx" class="cart-item">
+            <div>
+              <strong>{{ item.subject }}</strong>
+              <div class="muted">{{ item.location }} • {{ item.instructor }}</div>
+            </div>
+            <div class="cart-controls">
+              <div>£{{ item.price.toFixed(2) }}</div>
+              <button class="btn small alt" @click="removeFromCart(idx)">Remove</button>
+            </div>
+          </li>
+        </ul>
+
+        <div class="checkout-row" v-if="cart.length">
+          <div class="totals">
+            <div>Total items: {{ cart.length }}</div>
+            <div class="total">Total: £{{ cartTotal.toFixed(2) }}</div>
+          </div>
+
+          <div class="checkout-actions">
+            <button class="btn" @click="checkout" :disabled="!checkoutEnabled">{{ checkoutLoading ? 'Processing...' : 'Confirm booking' }}</button>
+            <button class="btn alt" @click="clearCart">Clear cart</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PURCHASE CONFIRMATION -->
+      <section v-if="page === 'confirmation'" class="card">
+        <h2>Booking Confirmed 🎉</h2>
+        <p>Thanks{{ user ? ', ' + user.name : '' }} — your booking has been recorded client-side for demo purposes.</p>
+        <p><strong>Items:</strong></p>
+        <ul>
+          <li v-for="(i, idx) in lastPurchase.items" :key="idx">{{ i.subject }} — £{{ i.price.toFixed(2) }}</li>
+        </ul>
+        <p><strong>Total:</strong> £{{ lastPurchase.total.toFixed(2) }}</p>
+
+        <div class="form-row">
+          <button class="btn" @click="goTo('bookstore')">Back to lessons</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer"> 
+      <small>Demo app — client-side only. For production, use a server + database for auth, booking and payments.</small>
+    </footer>
+  </div>
+</body>
+</html>
