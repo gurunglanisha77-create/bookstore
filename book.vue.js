@@ -19,18 +19,7 @@ createApp({
       loginError: '',
 
       // lessons: 10 items with subject, location, price, spaces, instructor, schedule, description
-      lessons: [
-        { id: 1, subject: 'Science Exploration', location: 'Manchester', price: 30, spaces: 6, instructor: 'B. Khan', schedule: 'Tue 16:30-17:30', description: 'Hands-on science experiments.', image: "image/science.png" },
-        { id: 2, subject: 'Mathematics Basics', location: 'London', price: 25, spaces: 5, instructor: 'A. Green', schedule: 'Mon 16:00-17:00', description: 'Core math concepts & practice.', image: "image/math.jpg" },
-        { id: 3, subject: 'Physics Fundamentals', location: 'York', price: 32, spaces: 4, instructor: 'I. Lee', schedule: 'Wed 17:00-18:30', description: 'Mechanics and simple experiments.', image: "image/physics.jpg" },
-        { id: 4, subject: 'Chemistry Experiments', location: 'Newcastle', price: 33, spaces: 5, instructor: 'J. Walker', schedule: 'Thu 16:00-17:30', description: 'Safe, supervised chemistry labs.', image: "image/chemistry.jpg" },
-        { id: 5, subject: 'History of Europe', location: 'Birmingham', price: 27, spaces: 5, instructor: 'H. Wilson', schedule: 'Tue 18:00-19:00', description: 'From medieval to modern times.', image: "image/history.jpg" },
-        { id: 6, subject: 'English Grammar', location: 'Bristol', price: 20, spaces: 6, instructor: 'C. Smith', schedule: 'Wed 15:30-16:30', description: 'Grammar and composition skills.', image: "image/english.jpg" },
-        { id: 7, subject: 'Creative Writing', location: 'Leeds', price: 28, spaces: 4, instructor: 'D. Evans', schedule: 'Thu 17:00-18:00', description: 'Storytelling and creative expression.', image: "image/creative.jpg" },
-        { id: 8, subject: 'Art & Design', location: 'Liverpool', price: 35, spaces: 3, instructor: 'E. Clark', schedule: 'Fri 16:00-18:00', description: 'Drawing, color, and composition.', image: "image/art.jpg" },
-        { id: 9, subject: 'Esport Gaming', location: 'Cambridge', price: 45, spaces: 4, instructor: 'Coach Taylor', schedule: 'Sat 10:00-12:00', description: 'Master Esport Gaming strategies, teamwork, and competiton preparation.', image: "image/esport.jpg" },
-        { id: 10, subject: 'Music Theory', location: 'Oxford', price: 22, spaces: 7, instructor: 'G. Brown', schedule: 'Mon 17:00-18:00', description: 'Music reading & basic harmony.', image: "image/music.png" },
-      ],
+      lessons: [],
 
       // cart and purchases recorded client-side
       cart: [],
@@ -42,7 +31,10 @@ createApp({
       sortBy: 'default',
 
       // checkout state
-      checkoutLoading: false
+      checkoutLoading: false,
+
+      // lesson detail view
+      detailLesson: {}
     };
   },
 
@@ -88,6 +80,34 @@ createApp({
   },
 
   methods: {
+    // Fetch Lessons from backend
+    fetchLessons() {
+      const API_BASE = "http://localhost:3000";
+      fetch(`${API_BASE}/api/lessons`)
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.json();
+        })
+        .then(data => {
+          this.lessons =data.map((l, idx) => ({
+            id: l._id || idx + 1,
+            subject: l.subject || 'No subject',
+            location: l.location || 'Unknown',
+            price: l.price || 0,
+            spaces: l.spaces || 0,
+            instructor: l.instructor || 'TBD',
+            schedule: l.schedule || '',
+            description: l.description || '',
+            image: l.image || 'image/default.png'
+          }));
+
+          this.detailLesson = this.lessons[0] || {};
+        })
+        .catch(err => {
+          console.error("Failed to fetch lessons:", err);
+        });
+    },
+
     // simple client-side login
     login() {
       this.loginError = '';
@@ -227,7 +247,6 @@ createApp({
   created() {
     // restore any saved demo session
     this.restoreFromStorage();
-    // detailLesson fallback
-    this.detailLesson = this.lessons[0];
+    this.fetchLessons(); // fetch from backend
   }
 }).mount('#app');
