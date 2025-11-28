@@ -22,10 +22,14 @@
       <div class="nav-right">
         <template v-if="user">
           <span class="welcome">Hello, {{ user.name }}</span>
-          <button @click="goTo('bookstore')" class="linkish">Browse</button>
-          <button @click="goTo('cart')" class="linkish">Cart ({{ cart.length }})</button>
+        </template>
+        <button @click="goTo('bookstore')" class="linkish">Browse</button>
+        <button @click="goTo('cart')" class="linkish">Cart ({{ cart.length }})</button>
+
+        <template v-if="user">
           <button @click="logout" class="btn small">Logout</button>
         </template>
+        
       </div>
     </header>
 
@@ -52,10 +56,10 @@
 
           <hr />
 
-          <h3>Demo accounts (client-side demo only)</h3>
+
           <ul class="demo-list">
-            <li><strong>Parent</strong> — parent@example.com / 123</li>
-            <li><strong>Student</strong> — student@example.com / 234</li>
+            <li><strong>Parent</strong> — parent@gmail.com / 123</li>
+            <li><strong>Student</strong> — student@gmail.com / 234</li>
           </ul>
         </form>
       </section>
@@ -77,16 +81,22 @@
         </div>
 
         <div class="grid">
-          <article class="lesson" v-for="lesson in filteredLessons" :key="lesson.id">
-            <img :src="lesson.image" alt="Lesson image" class="lesson-image"/>
+          <article class="lesson" v-for="lesson in filteredLessons" :key="lesson._id">
+            <div class="lesson-img-wrapper">
+              <img :src="lesson.image" :alt="lesson.subject" />
+            </div>
+
             <div class="lesson-left">
               <h3 class="lesson-title">{{ lesson.subject }}</h3>
               <p class="muted">{{ lesson.instructor }} • {{ lesson.location }}</p>
               <p class="desc">{{ lesson.description }}</p>
               <p class="meta">
                 <strong>Schedule:</strong> {{ lesson.schedule }} 
-                <strong>Spaces:</strong> 
-                <span :class="{ full: lesson.spaces === 0 }">{{ lesson.spaces }}</span>
+
+                <span class="space-info">
+                  <strong>Spaces:</strong> 
+                  <span :class="{ full: lesson.spaces === 0 }">{{ lesson.spaces }}</span>
+                </span>
               </p>
             </div>
 
@@ -150,7 +160,7 @@
       <!-- PURCHASE CONFIRMATION -->
       <section v-if="page === 'confirmation'" class="card">
         <h2>Booking Confirmed 🎉</h2>
-        <p>Thanks{{ user ? ', ' + user.name : '' }} — your booking has been recorded client-side for demo purposes.</p>
+        <p>Thanks{{ user ? ', ' + user.name : '' }} — your booking has been confirmed.</p>
         <p><strong>Items:</strong></p>
         <ul>
           <li v-for="(i, idx) in lastPurchase.items" :key="idx">{{ i.subject }} — £{{ i.price.toFixed(2) }}</li>
@@ -163,8 +173,8 @@
       </section>
     </main>
 
-    <footer class="footer"> 
-      <small>Demo app — client-side only. For production, use a server + database for auth, booking and payments.</small>
+    <footer class="footer">
+      📚 Bookstore-Your learning journey starts here.
     </footer>
   </div>
 </body>

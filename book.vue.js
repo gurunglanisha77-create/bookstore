@@ -1,10 +1,11 @@
 // Drop this in the same folder as index.html and styles.css
 const { createApp } = Vue;
 
-createApp({
+// CREATE AND ASSIGN THE APP IN ONE PLACE 
+const app = createApp({
   data() {
     return {
-      // simple page routing: 'login' | 'bookstore' | 'cart' | 'detail' | 'confirmation'
+      // simple page routing: 'login' | 'bookstore' | 'cart' | 'detail' | 'confirmation'  
       page: 'login',
 
       // demo preset users (client-side demo only)
@@ -14,13 +15,13 @@ createApp({
       ],
       user: null,
 
-      // login form
+      // login form     
       loginForm: { email: '', password: '' },
       loginError: '',
 
       // lessons: 10 items with subject, location, price, spaces, instructor, schedule, description
       lessons: [],
-
+      
       // cart and purchases recorded client-side
       cart: [],
       lastPurchase: { items: [], total: 0 },
@@ -51,9 +52,10 @@ createApp({
         const term = this.search.trim().toLowerCase();
         if (!term) return true;
         return (
-          l.subject.toLowerCase().includes(term) ||
-          l.location.toLowerCase().includes(term) ||
-          (l.instructor && l.instructor.toLowerCase().includes(term))
+          l.subject?.toLowerCase().includes(term) ||
+          l.location?.toLowerCase().includes(term) ||
+          l.instructor?.toLowerCase().includes(term) ||
+          l.description?.toLowerCase().includes(term)
         );
       });
 
@@ -72,76 +74,80 @@ createApp({
 
     checkoutEnabled() {
       // ensure cart items still have spaces > 0 (edge case)
-      return this.cart.length > 0 && this.cart.every(ci => {
-        const lesson = this.lessons.find(l => l.id === ci.id);
-        return lesson && ci._bookedTemp !== true; // reserved state not used here
-      });
+      return this.cart.length > 0 &&
+        this.cart.every(ci => {
+          const lesson = this.lessons.find(l => l._id === ci._id);
+          return lesson && lesson.spaces >= 0;
+        });
     }
   },
 
   methods: {
+    // For local testing use
+    apiBase() {
+      return "http://localhost:3000";
+    },
+
     // Fetch Lessons from backend
     fetchLessons() {
-      const API_BASE = "http://localhost:3000";
-      fetch(`${API_BASE}/api/lessons`)
+      const API_BASE = this.apiBase();
+
+      return fetch(`${API_BASE}/api/lessons`)
         .then(res => {
-          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          if (!res.ok) throw new Error(`HTTP error ${res.status}`);
           return res.json();
         })
         .then(data => {
-          this.lessons =data.map((l, idx) => ({
-            id: l._id || idx + 1,
-            subject: l.subject || 'No subject',
-            location: l.location || 'Unknown',
-            price: l.price || 0,
-            spaces: l.spaces || 0,
-            instructor: l.instructor || 'TBD',
-            schedule: l.schedule || '',
-            description: l.description || '',
-            image: l.image || 'image/default.png'
-          }));
+          console.log("LESSONS FROM BACKEND:", data);
 
-          this.detailLesson = this.lessons[0] || {};
+          this.lessons = data.map(l => ({
+            _id: String(l._id),
+            subject: l.subject || "No subject",
+            location: l.location || "Unknown",
+            price: Number(l.price) || 0,
+            spaces: Number(l.spaces) || 0,
+            instructor: l.instructor || "TBD",
+            schedule: l.schedule || "",
+            description: l.description || "",
+            image: `${API_BASE}/image/${l.image && l.image.trim() !== "" ? l.image : "default.jpg"}`
+          }));
+        
+        // default lesson to show in detail view
+        this.detailLesson = this.lessons[0] || {};
         })
         .catch(err => {
           console.error("Failed to fetch lessons:", err);
+          throw err;
         });
     },
 
     // simple client-side login
     login() {
       this.loginError = '';
-      const email = (this.loginForm.email || '').trim().toLowerCase();
-      const password = this.loginForm.password || '';
+      const email = this.loginForm.email.trim().toLowerCase();
+      const password = this.loginForm.password;
 
       if (!email || !password) {
         this.loginError = 'Please provide email and password.';
         return;
       }
-      // minimal client-side validation
-      if (!/.+@.+\..+/.test(email)) {
-        this.loginError = 'Please enter a valid email address.';
-        return;
-      }
-      if (password.length < 3) {
-        this.loginError = 'Password must be at least 3 characters.';
-        return;
-      }
+
 
       const found = this.presetUsers.find(u => u.email === email && u.password === password);
+
       if (!found) {
-        this.loginError = 'Credentials not recognised (demo users shown below).';
+        this.loginError = 'Credentials not recognised.';
         return;
       }
 
-      // login success
-      this.user = { id: found.id, name: found.name, email: found.email };
-      // store in localStorage so page refresh keeps session in demo
-      localStorage.setItem('bookstore_user', JSON.stringify(this.user));
-      this.goTo('bookstore');
 
-      // reset form
+      this.user = { id: found.id, name: found.name, email: found.email };
+
+      localStorage.setItem('bookstore_user', JSON.stringify(this.user));
+
+      
       this.loginForm.password = '';
+      this.goTo('bookstore');
     },
 
     // logout
@@ -154,37 +160,35 @@ createApp({
     // change page
     goTo(p) {
       this.page = p;
-      // small UX: clear login error when moving away
+
       this.loginError = '';
     },
 
-    // add lesson to cart (decrement spaces)
+    // add lesson to cart
     addToCart(lesson) {
       if (lesson.spaces === 0) return;
-      // push a shallow copy to avoid mutating lesson object in cart removal later
-      const item = { id: lesson.id, subject: lesson.subject, price: lesson.price, location: lesson.location, instructor: lesson.instructor };
-      this.cart.push(item);
-      // decrement available spaces in source
-      const source = this.lessons.find(l => l.id === lesson.id);
-      if (source) source.spaces = Math.max(0, source.spaces - 1);
-      // ensure user is aware to login if not yet
-      if (!this.user) {
-        // not a blocking requirement, but encourage login
-        setTimeout(() => {
-          if (!this.user && confirm('You are booking as guest. Would you like to login or continue as guest?')) {
-            this.goTo('login');
-          }
-        }, 250);
-      }
+
+      this.cart.push({
+        _id: lesson._id,
+        subject: lesson.subject,
+        price: lesson.price,
+        location: lesson.location,
+        instructor: lesson.instructor
+      });
+
+      const src = this.lessons.find(l => l._id === lesson._id);
+      if (src) src.spaces = Math.max(0, src.spaces - 1);
     },
 
-    // remove from cart (and increment spaces back)
+    // remove from cart
     removeFromCart(idx) {
       const item = this.cart[idx];
+
       if (item) {
-        const source = this.lessons.find(l => l.id === item.id);
-        if (source) source.spaces = source.spaces + 1;
+        const source = this.lessons.find(l => l._id === item._id);
+        if (source) source.spaces++;
       }
+
       this.cart.splice(idx, 1);
     },
 
@@ -194,59 +198,123 @@ createApp({
       this.goTo('detail');
     },
 
-    // clear cart (and restore spaces)
+    // clear cart 
     clearCart() {
       // restore spaces for each cart item
       this.cart.forEach(ci => {
-        const source = this.lessons.find(l => l.id === ci.id);
-        if (source) source.spaces = source.spaces + 1;
+        const source = this.lessons.find(l => l._id === ci._id);
+        if (source) source.spaces++;
       });
+
       this.cart = [];
     },
-
-    // checkout (client-side simulated)
+    
+    // checkout: validate name/phone, POST order, then PUT lesson updates
     async checkout() {
-      if (this.cart.length === 0) return;
-      if (!this.user) {
-        if (!confirm('You are not logged in. Bookings will be recorded only locally on this device. Continue?')) return;
+      if (this.cart.length === 0) return alert("Cart is empty");
+      // prompt for name & phone 
+      const name = prompt("Enter your full name (letters only):", this.user ? this.user.name : "");
+      const phone = prompt("Enter phone (numbers only):", "");
+
+      // ----- VALIDATE NAME -----
+      if (!name || !/^[A-Za-z\s]{2,}$/.test(name.trim())) {
+        alert("Please enter a valid name (letters only, min 2 characters).");
+        return;
       }
+
+      // ----- VALIDATE PHONE -----
+      if (!phone || !/^[0-9]{7,}$/.test(phone.trim())) {
+        alert("Please enter a valid phone number (numbers only, min 7 digits).");
+        return;
+      }   
+
+      const API_BASE = this.apiBase();
       this.checkoutLoading = true;
-      // simulate network
-      await new Promise(r => setTimeout(r, 800));
 
-      // produce lastPurchase object
-      this.lastPurchase = {
-        items: this.cart.map(c => ({ subject: c.subject, price: c.price })),
-        total: this.cart.reduce((s, i) => s + i.price, 0),
-        at: new Date().toISOString()
-      };
+      //build aggregated items : count quantities by lesson id
+      const aggregate = {};
+      this.cart.forEach(ci => {
+        aggregate[ci._id] = aggregate[ci._id] || {lessonId: ci._id, price: ci.price, quantity: 0, subject: ci.subject };
+        aggregate[ci._id].quantity +=1;
+      });
 
-      // persist lastPurchase in localStorage (demo)
-      localStorage.setItem('bookstore_lastPurchase', JSON.stringify(this.lastPurchase));
+      const items = Object.values(aggregate);
+      const totalPrice = items.reduce((s, it) => s + (it.price * it.quantity), 0);
 
-      // clear cart but DO NOT restore spaces (they are booked)
-      this.cart = [];
+      // prepare order payload
+      const orderPayload = { name, phone, items: items.map(i => ({ lessonId: i.lessonId, quantity: i.quantity, price: i.price})), totalPrice };
 
-      this.checkoutLoading = false;
-      this.goTo('confirmation');
+      this.checkoutLoading = true;
+
+      // POST the order
+      fetch(`${API_BASE}/api/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderPayload)
+      })
+      .then(res => {
+        if (!res.ok) return res.json().then(e => Promise.reject(e));
+        return res.json();
+      })
+      .then(orderResult => {
+        // For eachh aggregated item, compute and persist new spaces using PUT  
+        const updates = items.map(it => {
+          const clientLesson = this.lessons.find(l => l._id === it.lessonId);
+          const clientNewSpaces = clientLesson ? clientLesson.spaces : 0;
+          return fetch(`${API_BASE}/api/lessons/${it.lessonId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ spaces: clientNewSpaces })
+          })
+          .then(r => {
+            if (!r.ok) return r.json().then(e => Promise.reject(e));
+            return r.json();
+          });
+        });
+        
+        // Waiting for update to finish
+        return Promise.all(updates).then(() => orderResult);
+      })
+      .then(orderResult => {
+        // refresh lessons from server to get authorize state
+        return this.fetchLessons().then(() => orderResult);
+      })
+      .then(orderResult => {
+        // success: clear cart and show confirmation
+        this.lastPurchase = { items: items.map(i => ({ subject: i.subject, price: i.price, qty: i.quantity })), total: totalPrice, orderId: orderResult.insertedId || orderResult.insertedId };
+        localStorage.setItem('bookstore_lastPurchase', JSON.stringify(this.lastPurchase));
+        this.cart = [];
+        this.checkoutLoading = false;
+        this.goTo('confirmation');
+      })
+      .catch(err => {
+        console.error("checkout failed:", err);
+        alert("Checkout failed. See console for details.");
+        this.checkoutLoading = false;
+      });
     },
 
-    // load persisted session (demo)
     restoreFromStorage() {
       try {
         const u = localStorage.getItem('bookstore_user');
         if (u) this.user = JSON.parse(u);
+
         const lp = localStorage.getItem('bookstore_lastPurchase');
         if (lp) this.lastPurchase = JSON.parse(lp);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
     }
   },
 
   created() {
-    // restore any saved demo session
+
     this.restoreFromStorage();
-    this.fetchLessons(); // fetch from backend
+    this.fetchLessons();
   }
-}).mount('#app');
+
+});
+
+// CORRECT GLOBAL ASSIGNMENT 
+window.app = app;
+app.mount('#app');
+
+
